@@ -104,13 +104,15 @@ async function DealWithEvent(body) {
 
 router.route("/").post((req, res) => {
   DealWithEvent(req.body);
-  con.query(
-    `select * from Orders where order_id=${req.body.order_id}`,
-    (err, rows) => {
-      if (err) throw err;
-      res.json(rows);
-    }
-  );
+  setTimeout(() => {
+    con.query(
+      `select * from Orders where order_id=${req.body.order_id}`,
+      (err, rows) => {
+        if (err) throw err;
+        res.json(rows);
+      }
+    );
+  }, 3000);
 });
 
 module.exports = router;
