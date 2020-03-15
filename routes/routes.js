@@ -94,19 +94,19 @@ async function insertUpdateToLatest(body) {
   );
 }
 
-async function DealWithEvent(body) {
-  console.log(body.order_id);
-  await isOrderInUpdatedDB(body.order_id);
+async function DealWithEvent(body, id) {
+  console.log(id);
+  await isOrderInUpdatedDB(id);
   setTimeout(() => {
     insertUpdateToLatest(body);
   }, 2000);
 }
 
-router.route("/").post((req, res) => {
-  DealWithEvent(req.body);
+router.route("/:id").post((req, res) => {
+  DealWithEvent(req.body, req.params.id);
   setTimeout(() => {
     con.query(
-      `select * from Orders where order_id=${req.body.order_id}`,
+      `select * from Orders where order_id=${req.params.id}`,
       (err, rows) => {
         if (err) throw err;
         res.json(rows);
