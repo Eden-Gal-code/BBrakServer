@@ -12,7 +12,7 @@ app.use(express.json());
 //connecting to MYSQL
 
 //Use Routes
-const userRouter = require("../routes/routes");
+const userRouter = require("./routes/routes");
 
 app.use("/", userRouter);
 
