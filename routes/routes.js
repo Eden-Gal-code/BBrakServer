@@ -23,10 +23,7 @@ con.connect(function(err) {
   if (err) throw err;
   console.log("Connected to MYSQL");
 });
-// con.query("select * from Orders", (err, rows) => {
-//   if (err) throw err;
-//   console.log(rows);
-// });
+
 async function AddOrderFromAPI(order_id) {
   WooCommerce.get(`orders/${order_id}`)
     .then(response => {
@@ -107,7 +104,13 @@ async function DealWithEvent(body) {
 
 router.route("/").post((req, res) => {
   DealWithEvent(req.body);
-  res.json("recived");
+  con.query(
+    `select * from Orders where order_id=${req.body.order_id}`,
+    (err, rows) => {
+      if (err) throw err;
+      res.json(rows);
+    }
+  );
 });
 
 module.exports = router;
