@@ -73,13 +73,13 @@ async function insertUpdateToLatest(body) {
       var values = [
         body.order_id,
         body.status ? body.status : rows[0].status,
-        rows[0].date_created,
-        rows[0].date_modified,
-        rows[0].shipping_city,
+        body.date_created ? body.date_created : rows[0].date_created,
+        body.date_modified ? body.date_modified : rows[0].date_modified,
+        body.shipping_city ? body.shipping_city : rows[0].shipping_city,
         body.N_line_items ? body.N_line_items : rows[0].N_line_items,
         body.total_price ? body.total_price : rows[0].total_price,
-        rows[0].delivery_start,
-        rows[0].delivery_end,
+        body.delivery_start ? body.delivery_start : rows[0].delivery_start,
+        body.delivery_end ? body.delivery_end : rows[0].delivery_end,
         new Date(),
         true
       ];
