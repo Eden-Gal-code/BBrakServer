@@ -1,0 +1,15 @@
+{
+  "sql": {
+    "connectionLimit": 100,
+    "host": "shoply.c9tjqjh7enyf.us-east-1.rds.amazonaws.com",
+    "user": "eden",
+    "password": "Eden1234",
+    "database": "Eden"
+  },
+  "WC": {
+    "url": "https://bbrak.saal.co.il",
+    "consumerKey": "ck_2f675706d51c6a655e601fda6af67089bac639d7",
+    "consumerSecret": "cs_a7ba06c99206faf1f39594b8968b278f4e903592",
+    "version": "wc/v3"
+  }
+}

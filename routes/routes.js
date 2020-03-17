@@ -1,35 +1,43 @@
 const router = require("express").Router();
 const mysql = require("mysql");
+const config = require("../config.json");
+const MYSQLH = require("../mysql/MySqlHandle");
+const util = require("util");
 
 const WooCommerceRestApi = require("@woocommerce/woocommerce-rest-api").default;
 // import WooCommerceRestApi from "@woocommerce/woocommerce-rest-api"; // Supports ESM
 
-const WooCommerce = new WooCommerceRestApi({
-  url: "https://bbrak.saal.co.il",
-  consumerKey: "ck_2f675706d51c6a655e601fda6af67089bac639d7",
-  consumerSecret: "cs_a7ba06c99206faf1f39594b8968b278f4e903592",
-  version: "wc/v3"
-});
+const WooCommerce = new WooCommerceRestApi(config.WC);
 
-//
-var con = mysql.createConnection({
-  host: "shoply.c9tjqjh7enyf.us-east-1.rds.amazonaws.com",
-  user: "eden",
-  password: "Eden1234",
-  database: "Eden"
-});
+const MySqlHandle = new MYSQLH();
 
-con.connect(function(err) {
-  if (err) throw err;
-  console.log("Connected to MYSQL");
-});
+async function AddOrderFromAPI(order_id, callback) {
+  await WooCommerce.get(`orders/${order_id}`)
+    .then(async response => {
+      var delivery_start = new Date(
+        response.data.iconic_delivery_meta.date.substr(-4) +
+          "-" +
+          response.data.iconic_delivery_meta.date.substr(3, 2) +
+          "-" +
+          response.data.iconic_delivery_meta.date.substr(0, 2)
+      ).setHours(
+        response.data.iconic_delivery_meta.timeslot.substr(0, 2),
+        response.data.iconic_delivery_meta.timeslot.substr(3, 2),
+        "00"
+      );
+      var delivery_end = new Date(
+        response.data.iconic_delivery_meta.date.substr(-4) +
+          "-" +
+          response.data.iconic_delivery_meta.date.substr(3, 2) +
+          "-" +
+          response.data.iconic_delivery_meta.date.substr(0, 2)
+      ).setHours(
+        response.data.iconic_delivery_meta.timeslot.substr(-4, -2),
+        response.data.iconic_delivery_meta.timeslot.substr(-2, -2),
+        "00"
+      );
 
-async function AddOrderFromAPI(order_id) {
-  WooCommerce.get(`orders/${order_id}`)
-    .then(response => {
-      var sql =
-        "INSERT INTO Orders (order_id,status,date_created,date_modified,shipping_city,N_line_items,total_price,delivery_start,delivery_end,update_time, latest) VALUES(?)";
-      var values = [
+      this.values = [
         order_id,
         response.data.status,
         response.data.date_created,
@@ -37,82 +45,62 @@ async function AddOrderFromAPI(order_id) {
         response.data.shipping.city,
         response.data.line_items.length,
         response.data.total,
-        response.data.date_paid,
-        response.data.date_complete,
+        new Date(delivery_start),
+        new Date(delivery_end),
         new Date(),
         true
       ];
-      con.query(sql, [values], function(err, result) {
-        if (err) throw err;
-        console.log("Number of records inserted: " + result.affectedRows);
-      });
+      await MySqlHandle.InsertFromAPI(this.values);
     })
     .catch(error => {
       console.log(error);
     });
+  return await MySqlHandle.SelectLatest(order_id);
 }
 
 async function isOrderInUpdatedDB(order_id) {
-  con.query(`select * from Orders where order_id=${order_id} `, (err, rows) => {
-    if (err) throw err;
-    if (rows == 0) {
-      AddOrderFromAPI(order_id);
-    }
-  });
+  var rows = await MySqlHandle.SelectAll(order_id);
+
+  if (rows == 0) {
+    return await AddOrderFromAPI(order_id);
+  } else {
+    return 0;
+  }
 }
-async function insertUpdateToLatest(body) {
-  con.query(
-    `select * from Orders where order_id=${body.order_id} and latest=true `,
-    (err, rows) => {
-      if (err) throw err;
-      var sql =
-        "INSERT INTO Orders (order_id,status,date_created,date_modified,shipping_city,N_line_items,total_price,delivery_start,delivery_end,update_time, latest) VALUES(?)";
-      var values = [
-        body.order_id,
-        body.status ? body.status : rows[0].status,
-        body.date_created ? body.date_created : rows[0].date_created,
-        body.date_modified ? body.date_modified : rows[0].date_modified,
-        body.shipping_city ? body.shipping_city : rows[0].shipping_city,
-        body.N_line_items ? body.N_line_items : rows[0].N_line_items,
-        body.total_price ? body.total_price : rows[0].total_price,
-        body.delivery_start ? body.delivery_start : rows[0].delivery_start,
-        body.delivery_end ? body.delivery_end : rows[0].delivery_end,
-        new Date(),
-        true
-      ];
-      con.query(
-        `update Orders set latest=false where order_id=${body.order_id} and latest=true `,
-        function(err, result) {
-          if (err) throw err;
-          con.query(sql, [values], function(err, result) {
-            if (err) throw err;
-            console.log("Number of records inserted: " + result.affectedRows);
-          });
-        }
-      );
-    }
-  );
+async function insertUpdateToLatest(body, id, Rows) {
+  var rows = await MySqlHandle.SelectLatest(id);
+
+  var values = [
+    id,
+    "status" in body ? body.status : rows[0].status,
+    "date_created" in body ? body.date_created : rows[0].date_created,
+    "date_modified" in body ? body.date_modified : rows[0].date_modified,
+    "shipping_city" in body ? body.shipping_city : rows[0].shipping_city,
+    "N_line_items" in body ? body.N_line_items : rows[0].N_line_items,
+    "total_price" in body ? body.total_price : rows[0].total_price,
+    "delivery_start" in body ? body.delivery_start : rows[0].delivery_start,
+    "delivery_end" in body ? body.delivery_end : rows[0].delivery_end,
+    new Date(),
+    true
+  ];
+  await MySqlHandle.UpdateAndInsert(values, id);
+  return await MySqlHandle.SelectAll(id);
 }
 
 async function DealWithEvent(body, id) {
-  console.log(id);
-  await isOrderInUpdatedDB(id);
-  setTimeout(() => {
-    insertUpdateToLatest(body);
-  }, 2000);
+  rows = await isOrderInUpdatedDB(id);
+
+  return await insertUpdateToLatest(body, id, rows);
 }
 
 router.route("/:id").post((req, res) => {
-  DealWithEvent(req.body, req.params.id);
-  setTimeout(() => {
-    con.query(
-      `select * from Orders where order_id=${req.params.id}`,
-      (err, rows) => {
-        if (err) throw err;
-        res.json(rows);
-      }
-    );
-  }, 3000);
+  WooCommerce.get(`orders/${req.params.id}`)
+    .then(async response => {
+      res.json(await DealWithEvent(req.body, req.params.id));
+    })
+    .catch(error => {
+      res.json("error");
+    });
 });
 
 module.exports = router;
